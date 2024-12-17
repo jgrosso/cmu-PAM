@@ -32,7 +32,7 @@ size_t keep_versions = 1000000;
 bool if_persistent = false;
 std::atomic<int> cur_txn;
 
-double add_new_orders(new_order_entry& no, txn_info& ti) {
+void add_new_orders(new_order_entry& no, txn_info& ti) {
   timer t; t.start();
   maps m = history[history.size()-1];
   customer_map cm = m.cm;
@@ -42,10 +42,10 @@ double add_new_orders(new_order_entry& no, txn_info& ti) {
   using c_entry = typename customer_map::E;
   using o_entry = typename order_map::E;
   o_entry oe = make_pair(no.o.orderkey, make_pair(no.o, lm));
-  o_order_map oom = m.oom;
-  part_to_supp_map psm = m.psm2;
+  // o_order_map oom = m.oom;
+  // part_to_supp_map psm = m.psm2;
   order_map om = m.om;
-  supp_to_part_map spm = m.spm2;
+  // supp_to_part_map spm = m.spm2;
 	
 	
   {
@@ -63,6 +63,7 @@ double add_new_orders(new_order_entry& no, txn_info& ti) {
 	
 	
 	
+  /*
   {
     //update supp->part->lineitem
     for (int i = 0; i < num; i++) {
@@ -82,8 +83,10 @@ double add_new_orders(new_order_entry& no, txn_info& ti) {
       spm.update(suppk, f);
     }
   }
+  */
 	
 	
+  /*
   {
     //update part->supp->lineitem
     for (int i = 0; i < num; i++) {
@@ -100,26 +103,29 @@ double add_new_orders(new_order_entry& no, txn_info& ti) {
       psm.update(partk, f);
     }
   }
+  */
 	
+  /*
   //add to new_order queue
   ti.new_order_q.push_back(make_pair(no.o.custkey,no.o.orderkey));
+  */
 	
   maps nm = m;
   nm.cm = cm;
-  nm.spm2 = spm;
-  nm.oom = oom;
+  // nm.spm2 = spm;
+  // nm.oom = oom;
   nm.om = om;
-  nm.psm2 = psm;
+  // nm.psm2 = psm;
   nm.version = history.size();
 	
   history.push_back(nm);
-  double ret_tm = t.stop();
-  return ret_tm;
+  // double ret_tm = t.stop();
+  // return ret_tm;
 }
 
-double payment(payment_entry& pay, txn_info& ti) {
+void payment(payment_entry& pay, txn_info& ti) {
   maps m = history[history.size()-1];
-  timer t; t.start();
+  // timer t; t.start();
   customer_map cm = m.cm;
   auto f = [&] (customer_map::E e) {
     e.second.first.acctbal -= pay.amount;
@@ -131,10 +137,12 @@ double payment(payment_entry& pay, txn_info& ti) {
   nm.version = history.size();
 	
   history.push_back(nm);
-  return t.stop();
+  // return t.stop();
 }
 
 double shipment(shipment_entry& ship, txn_info& ti) {
+	std::cerr << "Shipments have been disabled!" << std::endl;
+	std::abort();
   maps m = history[history.size()-1];
   timer t; t.start();
   customer_map cm = m.cm;
@@ -329,16 +337,16 @@ double exe_txns(transaction* txns, int num_txns, txn_info& ti, bool verbose) {
   for (int i = 0; i < num_txns; i++) {
 	cur_txn = i;
     if (txns[i].type == 'N') {
-      timer t; t.start();
-	  double x = add_new_orders(ti.new_orders[i], ti); 
+      // timer t; t.start();
+	  add_new_orders(ti.new_orders[i], ti); 
       if (if_persistent) output_new_order(ti.new_orders[i], myfile);
-      n_timer[numn++] = x;//t.stop();
+      n_timer[numn++] = 0;//t.stop();
     }
     if (txns[i].type == 'P') {
-      timer t; t.start();
-	  double x = payment(ti.payments[i], ti); 
+      // timer t; t.start();
+	  payment(ti.payments[i], ti); 
       if (if_persistent) output_payment(ti.payments[i], myfile);
-      p_timer[nump++] = x;//t.stop(); 
+      p_timer[nump++] = 0;//t.stop(); 
     }
     if (txns[i].type == 'S') {
 	  timer t; t.start();
@@ -351,6 +359,7 @@ double exe_txns(transaction* txns, int num_txns, txn_info& ti, bool verbose) {
 		parlay::parallel_for(last, history.size()-1, [&] (size_t i) { history[i].clear();});
 		last = history.size()-1;
 	}
+	/*
     size_t t = li_map::GC::used_node();
 	
     if (t > max_lineitem) max_lineitem = t;
@@ -362,6 +371,7 @@ double exe_txns(transaction* txns, int num_txns, txn_info& ti, bool verbose) {
     if (t > max_order) max_order = t;
     t = customer_map::GC::used_node();
     if (t > max_customer) max_customer = t;
+    */
 	
   }
   if (verbose) cout << endl;
@@ -431,7 +441,7 @@ void post_process(double** tm, int round) {
 	
   double res[queries];
   double tot = 0;
-  int no[] = {22,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21};
+  int no[] = {1,5,6,13,14};
   round--;
   cout << "total rounds: " << round << endl;
   for (int i = 0; i < queries; i++) {
@@ -480,7 +490,7 @@ void test_all(bool verbose, bool if_query, bool if_update,
   int wgts[] = {45, 88, 92, 96, 100};
   //int wgts[] = {100, 100, 100};
   for (int i = 0; i < num_txns; i++) {
-    int rand = random_hash('q'+'t', i, 0, 92);
+    int rand = random_hash('q'+'t', i, 0, 88);
     if (rand<wgts[0]) {
       txns[i].type = 'N'; txns[i].ind = i;
     } else {
